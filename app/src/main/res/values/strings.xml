@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">AURA</string>
+    <string name="accessibility_service_description">AURA Assistive Automation Service. When explicitly enabled by you, allows AURA to execute authorized system actions such as taking screenshots, returning to home, or global navigation only after your explicit confirmation.</string>
+</resources>

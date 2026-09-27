@@ -1,0 +1,6 @@
+{
+  "name": "AURA",
+  "description": "AURA — AI Universal Remote Assistant. Futuristic personal AI assistant with permission-first Android automation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

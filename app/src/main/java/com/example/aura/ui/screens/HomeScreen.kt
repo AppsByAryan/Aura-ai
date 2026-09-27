@@ -1,6 +1,8 @@
 package com.example.aura.ui.screens
 
 import android.Manifest
+import android.accounts.AccountManager
+import android.app.Activity
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -143,6 +145,25 @@ fun HomeScreen(
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { /* granted */ }
+
+    val accountPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            val accountName = result.data?.getStringExtra(AccountManager.KEY_ACCOUNT_NAME)
+            if (!accountName.isNullOrBlank()) {
+                viewModel.onGoogleAccountChosen(accountName)
+            }
+        }
+    }
+
+    fun launchGoogleSignInOrSwitch() {
+        try {
+            accountPickerLauncher.launch(viewModel.getGoogleAccountPickerIntent())
+        } catch (_: Exception) {
+            showUserDialog = true
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -373,12 +394,15 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Surface(
                             shape = CircleShape,
                             color = AuraCyan.copy(alpha = 0.25f),
                             border = BorderStroke(1.dp, AuraCyan),
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(26.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
@@ -390,38 +414,80 @@ fun HomeScreen(
                             }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (currentUser.isSignedIn) "User: ${currentUser.displayName}" else "Sign in with Google",
+                                text = if (currentUser.isSignedIn) "User: ${currentUser.displayName}" else "Guest Mode • Sign in with Google",
                                 color = AuraTextPrimary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1
                             )
-                            if (currentUser.isSignedIn && currentUser.email.isNotBlank()) {
-                                Text(
-                                    text = currentUser.email,
-                                    color = AuraCyan,
-                                    fontSize = 9.sp,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
+                            Text(
+                                text = if (currentUser.isSignedIn && currentUser.email.isNotBlank()) currentUser.email else "Tap to choose Google account",
+                                color = if (currentUser.isSignedIn) AuraCyan else AuraTextMuted,
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1
+                            )
                         }
                     }
 
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = if (currentUser.isSignedIn) AuraSuccess.copy(alpha = 0.15f) else AuraCyan.copy(alpha = 0.15f),
-                        border = BorderStroke(1.dp, if (currentUser.isSignedIn) AuraSuccess.copy(alpha = 0.5f) else AuraCyan.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = if (currentUser.isSignedIn) "GOOGLE LINKED" else "TAP TO SIGN IN",
-                            color = if (currentUser.isSignedIn) AuraSuccess else AuraCyan,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+                        if (currentUser.isSignedIn) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = AuraError.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, AuraError.copy(alpha = 0.5f)),
+                                modifier = Modifier
+                                    .clickable { viewModel.signOutGoogle() }
+                                    .testTag("banner_sign_out_button")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Logout, contentDescription = "Sign Out", tint = AuraError, modifier = Modifier.size(11.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "SIGN OUT",
+                                        color = AuraError,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        } else {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = AuraCyan.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, AuraCyan.copy(alpha = 0.5f)),
+                                modifier = Modifier
+                                    .clickable { launchGoogleSignInOrSwitch() }
+                                    .testTag("banner_sign_in_button")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Login, contentDescription = "Sign In", tint = AuraCyan, modifier = Modifier.size(11.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "SIGN IN",
+                                        color = AuraCyan,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -653,6 +719,7 @@ fun HomeScreen(
             var showManualInput by remember { mutableStateOf(false) }
             var editName by remember(currentUser) { mutableStateOf(currentUser.displayName) }
             var editEmail by remember(currentUser) { mutableStateOf(currentUser.email) }
+            val detectedAccounts = remember(showUserDialog) { viewModel.getDeviceGoogleAccounts() }
 
             AlertDialog(
                 onDismissRequest = { showUserDialog = false },
@@ -701,11 +768,53 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.height(14.dp))
 
+                            if (detectedAccounts.isNotEmpty()) {
+                                Text(
+                                    text = "ACCOUNTS ON THIS DEVICE:",
+                                    color = AuraCyan,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    detectedAccounts.forEach { acc ->
+                                        Surface(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    viewModel.onGoogleAccountChosen(acc)
+                                                    showUserDialog = false
+                                                },
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (currentUser.email == acc) AuraCyan.copy(alpha = 0.15f) else Color(0x220A192F),
+                                            border = BorderStroke(1.dp, if (currentUser.email == acc) AuraCyan else AuraBorderGlow)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(text = acc, color = AuraTextPrimary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                                                Text(
+                                                    text = if (currentUser.email == acc) "ACTIVE" else "SWITCH",
+                                                    color = if (currentUser.email == acc) AuraCyan else AuraTextMuted,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = FontFamily.Monospace
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                            }
+
                             // One-tap switcher button
                             Button(
                                 onClick = {
                                     showUserDialog = false
-                                    viewModel.signInWithGoogle(context)
+                                    launchGoogleSignInOrSwitch()
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(containerColor = AuraCyan, contentColor = Color.Black),
@@ -713,7 +822,7 @@ fun HomeScreen(
                             ) {
                                 Icon(Icons.Default.Login, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("SYSTEM GOOGLE ACCOUNT CHOOSER", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("CHOOSE / ADD GOOGLE ACCOUNT", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -726,6 +835,24 @@ fun HomeScreen(
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = AuraCyan)
                             ) {
                                 Text("SWITCH / ENTER ACCOUNT MANUALLY", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            if (currentUser.isSignedIn) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedButton(
+                                    onClick = {
+                                        showUserDialog = false
+                                        viewModel.signOutGoogle()
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, AuraError.copy(alpha = 0.6f)),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AuraError)
+                                ) {
+                                    Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("SIGN OUT FROM GOOGLE", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                }
                             }
                         } else {
                             Text(

@@ -1,6 +1,9 @@
 package com.example.aura.auth
 
+import android.accounts.Account
+import android.accounts.AccountManager
 import android.content.Context
+import android.content.Intent
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -22,6 +25,54 @@ class GoogleAuthManager(
 
     // Google Cloud OAuth project: gen-lang-client-0868525895 (Project Number: 1020527569133)
     private val serverClientId = "1020527569133-android.apps.googleusercontent.com"
+
+    fun getGoogleAccountPickerIntent(selectedEmail: String? = null): Intent {
+        val selectedAccount = if (!selectedEmail.isNullOrBlank()) {
+            Account(selectedEmail, "com.google")
+        } else null
+
+        return AccountManager.newChooseAccountIntent(
+            selectedAccount,
+            null,
+            arrayOf("com.google"),
+            null,
+            null,
+            null,
+            null
+        )
+    }
+
+    fun getDeviceGoogleAccounts(): List<String> {
+        return try {
+            val am = AccountManager.get(context)
+            am.getAccountsByType("com.google").map { it.name }.filter { it.isNotBlank() }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun onAccountSelected(email: String, displayName: String? = null): AuraUser {
+        val cleanEmail = email.trim()
+        val cleanName = if (!displayName.isNullOrBlank()) {
+            displayName.trim()
+        } else {
+            cleanEmail.substringBefore("@")
+                .replace(".", " ")
+                .replace("_", " ")
+                .split(" ")
+                .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+        }
+        val user = AuraUser(
+            isSignedIn = cleanEmail.isNotBlank(),
+            id = cleanEmail,
+            email = cleanEmail,
+            displayName = cleanName,
+            givenName = cleanName.split(" ").firstOrNull() ?: cleanName,
+            familyName = cleanName.split(" ").drop(1).joinToString(" ")
+        )
+        preferences.saveUserProfile(user)
+        return user
+    }
 
     suspend fun signIn(activityContext: Context): Result<AuraUser> = withContext(Dispatchers.IO) {
         try {
@@ -49,7 +100,6 @@ class GoogleAuthManager(
         } catch (e: GetCredentialCancellationException) {
             Result.failure(Exception("Sign in was cancelled by user."))
         } catch (e: Exception) {
-            // Do not silently force hardcoded email - report real reason so user can pick/switch or enter account
             Result.failure(e)
         }
     }
@@ -91,16 +141,6 @@ class GoogleAuthManager(
     }
 
     fun switchOrSetAccount(name: String, email: String, photoUrl: String = ""): AuraUser {
-        val cleanEmail = email.trim()
-        val cleanName = if (name.isNotBlank()) name.trim() else cleanEmail.substringBefore("@").replaceFirstChar { it.uppercase() }
-        val user = AuraUser(
-            isSignedIn = cleanEmail.isNotBlank(),
-            id = cleanEmail,
-            email = cleanEmail,
-            displayName = cleanName,
-            photoUrl = photoUrl
-        )
-        preferences.saveUserProfile(user)
-        return user
+        return onAccountSelected(email, name)
     }
 }

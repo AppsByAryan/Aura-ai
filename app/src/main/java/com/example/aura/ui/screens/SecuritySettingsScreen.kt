@@ -1,7 +1,11 @@
 package com.example.aura.ui.screens
 
+import android.accounts.AccountManager
+import android.app.Activity
 import android.content.Intent
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -113,6 +117,27 @@ fun SecuritySettingsScreen(
     var showManualAccountDialog by remember { mutableStateOf(false) }
     var manualAccountName by remember(currentUser) { mutableStateOf(currentUser.displayName) }
     var manualAccountEmail by remember(currentUser) { mutableStateOf(currentUser.email) }
+
+    val accountPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            val accountName = result.data?.getStringExtra(AccountManager.KEY_ACCOUNT_NAME)
+            if (!accountName.isNullOrBlank()) {
+                viewModel.onGoogleAccountChosen(accountName)
+            }
+        }
+    }
+
+    fun launchGoogleSignInOrSwitch() {
+        try {
+            accountPickerLauncher.launch(viewModel.getGoogleAccountPickerIntent())
+        } catch (_: Exception) {
+            showManualAccountDialog = true
+        }
+    }
+
+    val detectedAccounts = remember(currentUser) { viewModel.getDeviceGoogleAccounts() }
 
     val hasGeminiApiKey = try {
         val k = BuildConfig.GEMINI_API_KEY
@@ -268,13 +293,52 @@ fun SecuritySettingsScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    if (detectedAccounts.isNotEmpty()) {
+                        Text(
+                            text = "ACCOUNTS DETECTED ON THIS DEVICE:",
+                            color = AuraCyan,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            detectedAccounts.forEach { acc ->
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { viewModel.onGoogleAccountChosen(acc) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (currentUser.email == acc) AuraCyan.copy(alpha = 0.15f) else Color(0x220A192F),
+                                    border = BorderStroke(1.dp, if (currentUser.email == acc) AuraCyan else AuraBorderGlow)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(text = acc, color = AuraTextPrimary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                                        Text(
+                                            text = if (currentUser.email == acc) "ACTIVE" else "SELECT",
+                                            color = if (currentUser.email == acc) AuraCyan else AuraTextMuted,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Button(
-                                onClick = { viewModel.signInWithGoogle(context) },
+                                onClick = { launchGoogleSignInOrSwitch() },
                                 modifier = Modifier
                                     .weight(1f)
                                     .testTag("google_sign_in_button"),
@@ -287,7 +351,7 @@ fun SecuritySettingsScreen(
                                 Icon(Icons.Default.Login, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (currentUser.isSignedIn) "GOOGLE CHOOSER" else "SIGN IN WITH GOOGLE",
+                                    text = if (currentUser.isSignedIn) "CHOOSE GOOGLE ACCOUNT" else "SIGN IN WITH GOOGLE",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp
                                 )
@@ -318,7 +382,7 @@ fun SecuritySettingsScreen(
                             ) {
                                 Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("SIGN OUT (SWITCH TO GUEST)", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("SIGN OUT FROM GOOGLE", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             }
                         }
                     }

@@ -61,6 +61,23 @@ class AuraViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentUser = MutableStateFlow(authManager.getCurrentUser())
     val currentUser: StateFlow<AuraUser> = _currentUser.asStateFlow()
 
+    fun getGoogleAccountPickerIntent(): Intent {
+        return authManager.getGoogleAccountPickerIntent(_currentUser.value.email)
+    }
+
+    fun getDeviceGoogleAccounts(): List<String> {
+        return authManager.getDeviceGoogleAccounts()
+    }
+
+    fun onGoogleAccountChosen(email: String, name: String? = null) {
+        val user = authManager.onAccountSelected(email, name)
+        _currentUser.value = user
+        _auraState.value = AuraState.IDLE
+        addSystemMessage("✅ Switched Google Account: ${user.displayName} (${user.email})")
+        voiceManager.speak("Welcome, ${user.displayName}!")
+        notificationManager.showWorkDoneNotification("Google Account Connected", "Signed in as ${user.displayName}")
+    }
+
     fun signInWithGoogle(activityContext: Context) {
         viewModelScope.launch {
             _auraState.value = AuraState.THINKING
@@ -73,7 +90,7 @@ class AuraViewModel(application: Application) : AndroidViewModel(application) {
                 notificationManager.showWorkDoneNotification("Google Account Connected", "Signed in as ${user.displayName}")
             }.onFailure { err ->
                 _auraState.value = AuraState.IDLE
-                addSystemMessage("Google sign-in: ${err.localizedMessage ?: "Account selection cancelled"}. You can also enter an account manually below.")
+                addSystemMessage("Google sign-in: ${err.localizedMessage ?: "Account selection cancelled"}. Use Choose Google Account or enter below.")
             }
         }
     }
@@ -89,8 +106,9 @@ class AuraViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             authManager.signOut()
             _currentUser.value = preferences.getUserProfile()
-            addSystemMessage("Logged out of Google account. AURA is now in guest mode.")
+            addSystemMessage("Signed out of Google account. AURA is now in Guest mode.")
             voiceManager.speak("Signed out of Google account.")
+            notificationManager.showWorkDoneNotification("Google Account", "Signed out successfully")
         }
     }
 

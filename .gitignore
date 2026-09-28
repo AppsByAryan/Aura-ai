@@ -16,3 +16,7 @@
 local.properties
 .env
 debug.keystore
+*.jks
+*.keystore
+aura-release.jks
+my-upload-key.jks

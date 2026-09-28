@@ -24,11 +24,14 @@ android {
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
+      // Used by GitHub Actions for release-signed APKs.
+      // Secrets are provided as env vars (never committed).
+      val keystorePath =
+        System.getenv("ANDROID_KEYSTORE_PATH") ?: "${rootDir}/aura-release.jks"
       storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+      storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+      keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: "aura"
+      keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
     }
   }
 
